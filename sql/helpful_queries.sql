@@ -30,7 +30,3 @@ FROM unnest((
              Where ts BETWEEN '2023-06-30 00:00:00+00:00'::TIMESTAMPTZ AND '2024-01-01 00:00:00+00:00'::TIMESTAMPTZ AND signal_id = 144986
              )
      );
-
-ALTER EXTENSION timescaledb UPDATE;
-
-ALTER EXTENSION timescaledb_toolkit UPDATE;
