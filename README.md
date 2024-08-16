@@ -55,6 +55,9 @@ and then installing the requirements with
 pip install -r requirements.txt
 ```
 
+Before you can upload the data (executing the data_insert.py file) you need to create a folder called data and put the 
+csv files in there.
+
 After uploading the data you need to compress the chunks
 first in order to get good performance. See helpful_queries.sql for more information.
 
