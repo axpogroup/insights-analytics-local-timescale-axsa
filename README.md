@@ -17,6 +17,7 @@ this Master project.
 ### Task 1: 
 Scalable LLTB LTTB becomes inefficient when applied to high-frequency data over extended periods.
 The goal of this task is to enhance the performance of LTTB under these conditions.
+This paper https://arxiv.org/abs/2305.00332 proposes to use a preselection of points for this.
 
 ### Task 2: 
 Aggregated LLTB In its current form, LTTB allows visualization of individual timeseries signals separately.
