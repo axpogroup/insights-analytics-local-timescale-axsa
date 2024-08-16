@@ -43,7 +43,18 @@ docker compose -f docker-compose.yml up
 
 ## Uploading data
 
-You can upload data by just executing the data_insert.py file. After uploading the data you need to compress the chunks
+You can upload data by just executing the data_insert.py file. To run the python file, we recommend first creating and activating a venv
+```
+python3 -m venv venv
+source venv/bin/activate
+```
+
+and then installing the requirements with 
+```
+pip install -r requirements.txt
+```
+
+After uploading the data you need to compress the chunks
 first in order to get good performance. See helpful_queries.sql for more information.
 
 Have a look at the documentation of the [timescaledb](https://docs.timescale.com/timescaledb/latest/overview) for more information.
