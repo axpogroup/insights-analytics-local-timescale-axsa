@@ -51,7 +51,7 @@ Have a look at the documentation of the [timescaledb](https://docs.timescale.com
 
 ## Data to start with 
 
-We have currently two signals in the csv. On frequent signal and one infrequent signal. Currently, executing lttb on the 
+We have currently two signals in the csv. One frequent signal and one infrequent signal. Currently, executing lttb on the 
 high frequent data is not efficient and takes a lot of time. 
 
 - 144986 --> frequent signal
