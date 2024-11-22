@@ -39,7 +39,7 @@ For testing porposes we have a docker-compose file that will start a timescale d
 ## Setup DB 
 
 ```bash
-docker compose -f docker-compose.yml up
+docker docker compose up --build 
 ```
 
 ## Uploading data
@@ -70,6 +70,16 @@ We have currently two signals in the csv. One frequent signal and one infrequent
 high frequent data is not efficient and takes a lot of time. 
 
 - 144986 --> frequent signal
-- 11883 --> infrequent signal
+- 11883 --> infrequent signal$
+
+# Postgres & Rust
+
+Check out here: https://kaiwern.com/posts/2022/07/20/writing-postgresql-extension-in-rust-with-pgx/
+
+We build a postgres extension called my_extension. The function can be defined in lib.rs file. 
+Everytime you change there something you need to build the docker image new. So you need to make sure that your rust 
+code is correct and compiles.
+
+
 
 
