@@ -2,8 +2,10 @@ version: '3.8'
 
 services:
   timescaledb:
-    image: timescale/timescaledb-ha:pg14.8-ts2.11.1-all
-    container_name: timescaledb
+    build:
+        context: .
+        dockerfile: Dockerfile
+        target: timescale_db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: yourpassword
@@ -12,5 +14,3 @@ services:
       - ./initdb:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
-volumes:
-  timescaledb-data:
