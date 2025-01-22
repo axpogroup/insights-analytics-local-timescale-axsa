@@ -6,13 +6,13 @@ from psycopg2.extras import execute_values
 if __name__ == "__main__":
     # Database connection parameters
     DB_HOST = "localhost"
-    DB_PORT = "5432"
+    DB_PORT = "8001"
     DB_NAME = "postgres"
     DB_USER = "postgres"
     DB_PASSWORD = "yourpassword"
 
     # CSV file path
-    CSV_FILE_PATH = "data/raw_data.csv"
+    CSV_FILE_PATH = "data/export_raw_data.csv"
 
     # Read the CSV file into a pandas DataFrame
     df = pd.read_csv(CSV_FILE_PATH)
