@@ -67,19 +67,13 @@ fn lttb(signal: &Signal, threshold: usize) -> Signal {
     }
 }
 
-#[pg_extern]
-fn find_last_and_sum(signal: Signal, points: Signal) -> Signal {
+// Find last and sum operation
+fn find_last_and_sum(signal: &Signal, points: &Signal) -> Signal {
     let mut summed_values = Vec::new();
 
     for (i, &timestamp) in points.ts.iter().enumerate() {
-        let mut index = signal
-            .ts
-            .binary_search_by(|&probe| probe.partial_cmp(&timestamp).unwrap())
+        let index = signal.ts.binary_search_by(|&probe| probe.partial_cmp(&timestamp).unwrap())
             .unwrap_or_else(|x| x.saturating_sub(1));
-
-        if index >= signal.ts.len() {
-            index = signal.ts.len() - 1;
-        }
 
         let total_value = signal.values[index] + points.values[i];
         summed_values.push(total_value);
@@ -91,21 +85,30 @@ fn find_last_and_sum(signal: Signal, points: Signal) -> Signal {
     }
 }
 
-// Process two signals and return a merged downsampled result
+// Process and merge two signals
 #[pg_extern]
-fn process_two_signals(signal_1: Signal, signal_2: Signal, threshold: i32) -> Signal {
-    let resampled_signal_1 = lttb(&signal_1, threshold as usize);
-    let resampled_signal_2 = lttb(&signal_2, threshold as usize);
+fn process_two_signals(
+    ts1: Vec<f64>,
+    values1: Vec<f64>,
+    ts2: Vec<f64>,
+    values2: Vec<f64>,
+    threshold: i32,
+) -> TableIterator<'static, (name!(timestamp, f64), name!(value, f64))> {
+    let signal1 = Signal { ts: ts1, values: values1 };
+    let signal2 = Signal { ts: ts2, values: values2 };
 
-    let summed_signal_1 = find_last_and_sum(signal_2.clone(), resampled_signal_1.clone());
-    let summed_signal_2 = find_last_and_sum(signal_1.clone(), resampled_signal_2.clone());
+    let resampled_signal1 = lttb(&signal1, threshold as usize);
+    let resampled_signal2 = lttb(&signal2, threshold as usize);
+
+    let summed_signal1 = find_last_and_sum(&signal2, &resampled_signal1);
+    let summed_signal2 = find_last_and_sum(&signal1, &resampled_signal2);
 
     let scale_factor = 1_000_000;
     let mut unique_ts: HashSet<i64> = HashSet::new();
-    for &ts in &summed_signal_1.ts {
+    for &ts in &summed_signal1.ts {
         unique_ts.insert((ts * scale_factor as f64).round() as i64);
     }
-    for &ts in &summed_signal_2.ts {
+    for &ts in &summed_signal2.ts {
         unique_ts.insert((ts * scale_factor as f64).round() as i64);
     }
 
@@ -117,20 +120,16 @@ fn process_two_signals(signal_1: Signal, signal_2: Signal, threshold: i32) -> Si
 
     let mut merged_values = Vec::new();
     for &timestamp in &merged_ts {
-        let value_1 = summed_signal_1
-            .ts
-            .iter()
+        let value_1 = summed_signal1.ts.iter()
             .position(|&t| (t * scale_factor as f64).round() as i64 == (timestamp * scale_factor as f64).round() as i64)
-            .map(|i| summed_signal_1.values[i]);
+            .map(|i| summed_signal1.values[i]);
 
-        let value_2 = summed_signal_2
-            .ts
-            .iter()
+        let value_2 = summed_signal2.ts.iter()
             .position(|&t| (t * scale_factor as f64).round() as i64 == (timestamp * scale_factor as f64).round() as i64)
-            .map(|i| summed_signal_2.values[i]);
+            .map(|i| summed_signal2.values[i]);
 
         let combined_value = match (value_1, value_2) {
-            (Some(v1), Some(_v2)) => v1,
+            (Some(v1), Some(_)) => v1,
             (Some(v1), None) => v1,
             (None, Some(v2)) => v2,
             (None, None) => 0.0,
@@ -139,10 +138,8 @@ fn process_two_signals(signal_1: Signal, signal_2: Signal, threshold: i32) -> Si
         merged_values.push(combined_value);
     }
 
-    Signal {
-        ts: merged_ts,
-        values: merged_values,
-    }
+    let result = merged_ts.into_iter().zip(merged_values).collect::<Vec<(f64, f64)>>();
+    TableIterator::new(result.into_iter())
 }
 
 #[cfg(any(test, feature = "pg_test"))]
@@ -167,7 +164,7 @@ mod tests {
     }
 }
 
-/// Required for `cargo pgrx test`
+/// Required for cargo pgrx test
 #[cfg(test)]
 pub mod pg_test {
     pub fn setup(_options: Vec<&str>) {}
@@ -175,3 +172,4 @@ pub mod pg_test {
         vec![]
     }
 }
+
