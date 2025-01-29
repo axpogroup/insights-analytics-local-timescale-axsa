@@ -81,5 +81,14 @@ Everytime you change there something you need to build the docker image new. So 
 code is correct and compiles.
 
 
+## Build the docker image
+
+If you change something in the rust code you need to build the docker image new.
+```bash
+ docker build --no-cache -t test_rust:tag1 . 
+```
+
+
+
 
 

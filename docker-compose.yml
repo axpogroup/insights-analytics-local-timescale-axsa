@@ -2,10 +2,7 @@ version: '3.8'
 
 services:
   timescaledb:
-    build:
-        context: .
-        dockerfile: Dockerfile
-        target: timescale_db
+    image: test_rust:tag1
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: yourpassword

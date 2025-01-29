@@ -31,7 +31,7 @@ RUN rustup component add rustfmt && cargo install cargo-pgrx && cargo pgrx init
 
 # Create a new extension
 RUN cargo pgrx new my_extension
-COPY ./rust_code/lib.rs my_extension/src/lib.rs
+COPY rust_code/lib.rs my_extension/src/lib.rs
 RUN cd my_extension && cargo pgrx install
 
 
