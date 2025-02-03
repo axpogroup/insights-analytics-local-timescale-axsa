@@ -12,7 +12,7 @@ if __name__ == "__main__":
     DB_PASSWORD = "yourpassword"
 
     # CSV file path
-    CSV_FILE_PATH = "data/raw_data.csv"
+    CSV_FILE_PATH = "data/export_raw_data.csv"
 
     # Read the CSV file into a pandas DataFrame
     df = pd.read_csv(CSV_FILE_PATH)
