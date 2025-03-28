@@ -27,7 +27,7 @@ lttb(sum(sig1, sig2, sig3)) or more generally lttb(func(x1, x2, x3,...)), where 
 like sum, minimum, maximum, or average, shall be implemented.
 
 
-### Task 3: 
+### Optinal: Task 3: 
 Multi-Dimensional LLTB Presently, LTTB is limited to processing a single signal at a time (e.g., lttb(sig1)). 
 The goal is expand LTTB to handle multiple signals simultaneously (e.g., lttb(sig1, sig2, ...)), 
 enabling more advanced and informative visualizations.
