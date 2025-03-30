@@ -1,0 +1,14 @@
+[workspace]
+members = ["."]
+
+[package]
+name = "lttb_sum_multiple_rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+polars = { version = "0.33", features = ["lazy", "csv", "ndarray", "serde"] }
+ndarray = "0.15"
+rayon = "1.7"
+plotters = "0.3"
+ordered-float = "5.0.0"
