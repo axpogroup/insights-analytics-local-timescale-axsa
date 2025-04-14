@@ -27,7 +27,7 @@ lttb(sum(sig1, sig2, sig3)) or more generally lttb(func(x1, x2, x3,...)), where 
 like sum, minimum, maximum, or average, shall be implemented.
 
 
-### Task 3: 
+### Optional: Task 3: 
 Multi-Dimensional LLTB Presently, LTTB is limited to processing a single signal at a time (e.g., lttb(sig1)). 
 The goal is expand LTTB to handle multiple signals simultaneously (e.g., lttb(sig1, sig2, ...)), 
 enabling more advanced and informative visualizations.
@@ -79,6 +79,20 @@ Check out here: https://kaiwern.com/posts/2022/07/20/writing-postgresql-extensio
 We build a postgres extension called my_extension. The function can be defined in lib.rs file. 
 Everytime you change there something you need to build the docker image new. So you need to make sure that your rust 
 code is correct and compiles.
+
+
+## Build the docker image
+
+If you change something in the rust code you need to build the docker image new.
+```bash
+ docker build --no-cache -t test_rust:tag1 . 
+```
+
+If you want to run the docker image you can do it with the following command:
+```bash
+docker compose up
+```
+
 
 
 

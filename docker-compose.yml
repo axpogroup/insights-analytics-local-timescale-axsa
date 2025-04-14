@@ -2,15 +2,12 @@ version: '3.8'
 
 services:
   timescaledb:
-    build:
-        context: .
-        dockerfile: Dockerfile
-        target: timescale_db
+    image: test_rust:tag2
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: yourpassword
       POSTGRES_DB: postgres
-    volumes:
-      - ./initdb:/docker-entrypoint-initdb.d
+   # volumes:
+    #  - ./initdb:/docker-entrypoint-initdb.d
     ports:
       - "8001:5432"
