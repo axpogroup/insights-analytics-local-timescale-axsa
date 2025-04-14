@@ -88,6 +88,11 @@ If you change something in the rust code you need to build the docker image new.
  docker build --no-cache -t test_rust:tag1 . 
 ```
 
+If you want to run the docker image you can do it with the following command:
+```bash
+docker compose up
+```
+
 
 
 
