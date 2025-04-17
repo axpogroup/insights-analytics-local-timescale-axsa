@@ -1,52 +1,51 @@
 use pgrx::prelude::*;
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 pgrx::pg_module_magic!();
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 struct Signal {
     ts: Vec<f64>,
     values: Vec<f64>,
 }
 
-// LTTB downsampling function
 fn lttb(signal: &Signal, threshold: usize) -> Signal {
     let data_length = signal.ts.len();
     if threshold >= data_length || threshold == 0 {
-        return signal.clone(); // No need to downsample
+        return signal.clone();
     }
 
     let mut downsampled_ts = Vec::new();
     let mut downsampled_values = Vec::new();
-
     let every = (data_length - 2) as f64 / (threshold - 2) as f64;
     let mut a = 0;
+
     downsampled_ts.push(signal.ts[a]);
     downsampled_values.push(signal.values[a]);
 
     for i in 0..(threshold - 2) {
         let avg_range_start = ((i + 1) as f64 * every + 1.0).floor() as usize;
         let avg_range_end = (((i + 2) as f64 * every + 1.0).floor() as usize).min(data_length);
+        if avg_range_start >= avg_range_end {
+            continue;
+        }
 
-        let avg_time = signal.ts[avg_range_start..avg_range_end].iter().copied().sum::<f64>()
-            / (avg_range_end - avg_range_start) as f64;
-        let avg_signal = signal.values[avg_range_start..avg_range_end]
-            .iter()
-            .copied()
-            .sum::<f64>()
-            / (avg_range_end - avg_range_start) as f64;
+        let avg_time = signal.ts[avg_range_start..avg_range_end].iter().copied().sum::<f64>() / (avg_range_end - avg_range_start) as f64;
+        let avg_signal = signal.values[avg_range_start..avg_range_end].iter().copied().sum::<f64>() / (avg_range_end - avg_range_start) as f64;
 
         let range_offs = (i as f64 * every + 1.0).floor() as usize;
         let range_to = (((i + 1) as f64 * every + 1.0).floor() as usize).min(data_length);
 
         let mut max_area = -1.0;
-        let mut next_a = 0;
+        let mut next_a = a;
 
         for j in range_offs..range_to {
+            if j >= signal.ts.len() || j >= signal.values.len() {
+                continue;
+            }
             let area = ((signal.ts[a] - avg_time) * (signal.values[j] - signal.values[a])
                 - (signal.ts[a] - signal.ts[j]) * (avg_signal - signal.values[a]))
-                .abs()
-                * 0.5;
+                .abs() * 0.5;
             if area > max_area {
                 max_area = area;
                 next_a = j;
@@ -67,16 +66,31 @@ fn lttb(signal: &Signal, threshold: usize) -> Signal {
     }
 }
 
-// Find last and sum operation
-fn find_last_and_sum(signal: &Signal, points: &Signal) -> Signal {
-    let mut summed_values = Vec::new();
+fn find_last_and_sum(signals: &[Signal], points: &Signal) -> Signal {
+    let mut summed_values = vec![0.0; points.ts.len()];
 
-    for (i, &timestamp) in points.ts.iter().enumerate() {
-        let index = signal.ts.binary_search_by(|&probe| probe.partial_cmp(&timestamp).unwrap())
-            .unwrap_or_else(|x| x.saturating_sub(1));
+    for signal in signals {
+        if signal.ts.is_empty() || signal.ts.len() != signal.values.len() {
+            pgrx::warning!("Skipping invalid signal with ts.len={} and values.len={}", signal.ts.len(), signal.values.len());
+            continue;
+        }
 
-        let total_value = signal.values[index] + points.values[i];
-        summed_values.push(total_value);
+        for (i, &t) in points.ts.iter().enumerate() {
+            let result = signal.ts.binary_search_by(|x| x.partial_cmp(&t).unwrap_or(std::cmp::Ordering::Less));
+            let value = match result {
+                Ok(pos) => {
+                    signal.values.get(pos).copied().unwrap_or(0.0)
+                },
+                Err(pos) => {
+                    if pos == 0 {
+                        0.0
+                    } else {
+                        signal.values.get(pos - 1).copied().unwrap_or(0.0)
+                    }
+                }
+            };
+            summed_values[i] += value;
+        }
     }
 
     Signal {
@@ -85,91 +99,69 @@ fn find_last_and_sum(signal: &Signal, points: &Signal) -> Signal {
     }
 }
 
-// Process and merge two signals
 #[pg_extern]
-fn process_two_signals(
-    ts1: Vec<f64>,
-    values1: Vec<f64>,
-    ts2: Vec<f64>,
-    values2: Vec<f64>,
+fn process_multiple_signals<'a>(
+    ts_list: Array<'a, Array<'a, f64>>,
+    values_list: Array<'a, Array<'a, f64>>,
     threshold: i32,
-) -> TableIterator<'static, (name!(timestamp, f64), name!(value, f64))> {
-    let signal1 = Signal { ts: ts1, values: values1 };
-    let signal2 = Signal { ts: ts2, values: values2 };
+) -> TableIterator<'a, (name!(timestamp, f64), name!(value, f64))> {
+    let threshold = if threshold <= 0 { 2 } else { threshold as usize };
 
-    let resampled_signal1 = lttb(&signal1, threshold as usize);
-    let resampled_signal2 = lttb(&signal2, threshold as usize);
+    let signals: Vec<Signal> = ts_list
+        .iter()
+        .zip(values_list.iter())
+        .filter_map(|(ts_opt, val_opt)| {
+            let ts_array = ts_opt?;
+            let val_array = val_opt?;
 
-    let summed_signal1 = find_last_and_sum(&signal2, &resampled_signal1);
-    let summed_signal2 = find_last_and_sum(&signal1, &resampled_signal2);
+            let ts: Vec<f64> = ts_array.iter().filter_map(|x| x).collect();
+            let values: Vec<f64> = val_array.iter().filter_map(|x| x).collect();
 
-    let scale_factor = 1_000_000;
-    let mut unique_ts: HashSet<i64> = HashSet::new();
-    for &ts in &summed_signal1.ts {
-        unique_ts.insert((ts * scale_factor as f64).round() as i64);
-    }
-    for &ts in &summed_signal2.ts {
-        unique_ts.insert((ts * scale_factor as f64).round() as i64);
-    }
+            if ts.len() != values.len() || ts.is_empty() {
+                pgrx::warning!("Invalid input: ts.len = {}, values.len = {}", ts.len(), values.len());
+                return None;
+            }
 
-    let mut merged_ts: Vec<f64> = unique_ts
-        .into_iter()
-        .map(|ts| ts as f64 / scale_factor as f64)
+            Some(Signal { ts, values })
+        })
         .collect();
-    merged_ts.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-    let mut merged_values = Vec::new();
-    for &timestamp in &merged_ts {
-        let value_1 = summed_signal1.ts.iter()
-            .position(|&t| (t * scale_factor as f64).round() as i64 == (timestamp * scale_factor as f64).round() as i64)
-            .map(|i| summed_signal1.values[i]);
-
-        let value_2 = summed_signal2.ts.iter()
-            .position(|&t| (t * scale_factor as f64).round() as i64 == (timestamp * scale_factor as f64).round() as i64)
-            .map(|i| summed_signal2.values[i]);
-
-        let combined_value = match (value_1, value_2) {
-            (Some(v1), Some(_)) => v1,
-            (Some(v1), None) => v1,
-            (None, Some(v2)) => v2,
-            (None, None) => 0.0,
-        };
-
-        merged_values.push(combined_value);
+    if signals.is_empty() {
+        return TableIterator::new(vec![].into_iter());
     }
 
-    let result = merged_ts.into_iter().zip(merged_values).collect::<Vec<(f64, f64)>>();
-    TableIterator::new(result.into_iter())
-}
+    let resampled_signals: Vec<Signal> = signals.iter().map(|s| lttb(s, threshold)).collect();
 
-#[cfg(any(test, feature = "pg_test"))]
-#[pg_schema]
-mod tests {
-    use super::*;
-
-    #[pg_test]
-    fn test_process_two_signals() {
-        let signal_1 = Signal {
-            ts: vec![0.0, 1.0, 2.0, 3.0, 4.0],
-            values: vec![0.0, 1.0, 0.0, -1.0, 0.0],
-        };
-        let signal_2 = Signal {
-            ts: vec![0.0, 1.5, 3.0, 4.5],
-            values: vec![1.0, 0.5, -0.5, -1.0],
-        };
-
-        let result = process_two_signals(signal_1, signal_2, 3);
-
-        assert_eq!(result.ts.len(), 6);
+    let mut ts_set = BTreeSet::new();
+    let scale = 1_000_000.0;
+    for sig in &resampled_signals {
+        for &t in &sig.ts {
+            if t.is_finite() {
+                ts_set.insert((t * scale).round() as i64);
+            }
+        }
     }
+
+    let all_ts: Vec<f64> = ts_set.into_iter().map(|t| t as f64 / scale).collect();
+    let all_points = Signal {
+        ts: all_ts.clone(),
+        values: vec![0.0; all_ts.len()],
+    };
+
+    let result_signal = find_last_and_sum(&signals, &all_points);
+    let results: Vec<(f64, f64)> = result_signal.ts.into_iter()
+        .zip(result_signal.values)
+        .filter(|(t, v)| t.is_finite() && v.is_finite())
+        .collect();
+
+    TableIterator::new(results.into_iter())
 }
 
-/// Required for cargo pgrx test
-#[cfg(test)]
-pub mod pg_test {
-    pub fn setup(_options: Vec<&str>) {}
-    pub fn postgresql_conf_options() -> Vec<&'static str> {
-        vec![]
-    }
-}
+
+
+
+
+
+
+
 

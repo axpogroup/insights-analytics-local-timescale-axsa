@@ -10,4 +10,4 @@ services:
    # volumes:
     #  - ./initdb:/docker-entrypoint-initdb.d
     ports:
-      - "5432:5432"
+      - "8001:5432"
