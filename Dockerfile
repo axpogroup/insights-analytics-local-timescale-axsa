@@ -38,8 +38,8 @@ RUN cargo pgrx init
 RUN cargo pgrx new my_extension
 # Copy the project files into the container
 
-COPY rust_code/Cargo.toml my_extension/Cargo.toml
-COPY rust_code/src/main.rs my_extension/src/lib.rs
+# COPY rust_code/Cargo.toml my_extension/Cargo.toml
+COPY rust_code/lib.rs my_extension/src/lib.rs
 
 RUN cd my_extension && cargo pgrx install
 
@@ -47,6 +47,5 @@ RUN cd my_extension && cargo pgrx install
 FROM --platform=linux/arm64 timescale/timescaledb-ha:pg15 AS timescale_db
 RUN mkdir -p /usr/share/postgresql/15/extension /usr/lib/postgresql/15/lib
 COPY --from=rust_build /usr/share/postgresql/15/extension/my_extension.control /usr/share/postgresql/15/extension/
-COPY --from=rust_build /my_extension/ /my_extension
 COPY --from=rust_build /usr/share/postgresql/15/extension/my_extension--0.0.0.sql /usr/share/postgresql/15/extension/
 COPY --from=rust_build /usr/lib/postgresql/15/lib/my_extension.so /usr/lib/postgresql/15/lib/
